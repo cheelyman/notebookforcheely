@@ -1,39 +1,58 @@
 import javax.crypto.Cipher;
-import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyFactory;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
 public class RSAEncryptionExample {
-
     public static void main(String[] args) throws Exception {
-        // load private key from file
-        String privateKeyContent = new String(Files.readAllBytes(Paths.get("path/to/your/private_key.pem")));
-        privateKeyContent = privateKeyContent.replaceAll("\\n", "").replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "");
-        PKCS8EncodedKeySpec keySpecPKCS8 = new PKCS8EncodedKeySpec(Base64.getDecoder().decode(privateKeyContent));
-        PrivateKey privateKey = KeyFactory.getInstance("RSA").generatePrivate(keySpecPKCS8);
+        // Load the private key from the file
+        PrivateKey privateKey = loadPrivateKey("private_key.pem");
 
-        // load public key from file
-        String publicKeyContent = new String(Files.readAllBytes(Paths.get("path/to/your/public_key.pem")));
-        publicKeyContent = publicKeyContent.replaceAll("\\n", "").replace("-----BEGIN PUBLIC KEY-----", "").replace("-----END PUBLIC KEY-----", "");
-        X509EncodedKeySpec keySpecX509 = new X509EncodedKeySpec(Base64.getDecoder().decode(publicKeyContent));
-        PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(keySpecX509);
+        // Load the public key from the file
+        PublicKey publicKey = loadPublicKey("public_key.pem");
 
         // The data you want to encrypt
         String data = "Hello, World!";
 
-        // Encrypt the data with private key
+        // Encrypt the data with the private key
         String encryptedData = encrypt(privateKey, data);
 
-        // Decrypt the data with public key
+        // Decrypt the data with the public key
         String decryptedData = decrypt(publicKey, encryptedData);
 
         System.out.println("Decrypted data: " + decryptedData);
+    }
+
+    public static PrivateKey loadPrivateKey(String filename) throws URISyntaxException, IOException, NoSuchAlgorithmException, InvalidKeySpecException {
+        URL privateKeyURL = RSAEncryptionExample.class.getClassLoader().getResource(filename);
+        URI privateKeyURI = privateKeyURL.toURI();
+        Path privateKeyPath = Paths.get(privateKeyURI);
+        String privateKeyContent = new String(Files.readAllBytes(privateKeyPath));
+        privateKeyContent = privateKeyContent.replaceAll("\\n", "").replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "");
+        PKCS8EncodedKeySpec keySpecPKCS8 = new PKCS8EncodedKeySpec(Base64.getDecoder().decode(privateKeyContent));
+        return KeyFactory.getInstance("RSA").generatePrivate(keySpecPKCS8);
+    }
+
+    public static PublicKey loadPublicKey(String filename) throws URISyntaxException, IOException, NoSuchAlgorithmException, InvalidKeySpecException {
+        URL publicKeyURL = RSAEncryptionExample.class.getClassLoader().getResource(filename);
+        URI publicKeyURI = publicKeyURL.toURI();
+        Path publicKeyPath = Paths.get(publicKeyURI);
+        String publicKeyContent = new String(Files.readAllBytes(publicKeyPath));
+        publicKeyContent = publicKeyContent.replaceAll("\\n", "").replace("-----BEGIN PUBLIC KEY-----", "").replace("-----END PUBLIC KEY-----", "");
+        X509EncodedKeySpec keySpecX509 = new X509EncodedKeySpec(Base64.getDecoder().decode(publicKeyContent));
+        return KeyFactory.getInstance("RSA").generatePublic(keySpecX509);
     }
 
     public static String encrypt(PrivateKey privateKey, String data) throws Exception {
@@ -46,7 +65,4 @@ public class RSAEncryptionExample {
     public static String decrypt(PublicKey publicKey, String encryptedData) throws Exception {
         Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
         cipher.init(Cipher.DECRYPT_MODE, publicKey);
-        byte[] decryptedData = cipher.doFinal(Base64.getDecoder().decode(encryptedData));
-        return new String(decryptedData);
-    }
-}
+        byte[] decryptedData = cipher
