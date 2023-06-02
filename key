@@ -60,4 +60,23 @@ public class SymmetricEncryption {
 
         return Base64.getEncoder().encodeToString(result);
     }
+    public class Main {
+    public static void main(String[] args) {
+        try {
+            String key = "your_secret_key";
+            String originalData = "Hello, World!";
+
+            // 加密数据
+            String encryptedData = SymmetricEncryption.encrypt(originalData, key);
+            System.out.println("Encrypted Data: " + encryptedData);
+
+            // 解密数据
+            String decryptedData = SymmetricEncryption.decrypt(encryptedData, key);
+            System.out.println("Decrypted Data: " + decryptedData);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+    
 }
