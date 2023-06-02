@@ -1,31 +1,28 @@
 import java.nio.charset.StandardCharsets;
-import java.security.*;
 import javax.crypto.*;
 import javax.crypto.spec.*;
+import java.security.spec.KeySpec;
+import javax.crypto.SecretKeyFactory;
+import java.util.Base64;
 
-public class AESGCMEncryption {
-    private static final int KEY_SIZE = 256;
+public class AESGCMEncryptor {
     private static final int IV_SIZE = 12;
     private static final int TAG_LENGTH = 128;
     private static final int SALT_LENGTH = 16;
     private static final String CHARACTER_SET = "UTF-8";
     private static final String CIPHER_ALGORITHM = "AES/GCM/NoPadding";
 
-    public static byte[] encrypt(String plaintext, String keyString) throws Exception {
-        // Generate salt
-        SecureRandom random = new SecureRandom();
-        byte[] salt = new byte[SALT_LENGTH];
-        random.nextBytes(salt);
+    private AESGCMEncryptor() {
+        // Private constructor to prevent instantiation
+    }
 
-        // Derive key from password using PBKDF2
-        SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-        KeySpec keySpec = new PBEKeySpec(keyString.toCharArray(), salt, 65536, KEY_SIZE);
-        SecretKey secretKey = keyFactory.generateSecret(keySpec);
-        SecretKeySpec secretKeySpec = new SecretKeySpec(secretKey.getEncoded(), "AES");
+    public static String encrypt(String plaintext, String keyString) throws Exception {
+        byte[] keyBytes = keyString.getBytes(CHARACTER_SET);
+        SecretKeySpec secretKeySpec = new SecretKeySpec(keyBytes, "AES");
 
-        // Generate IV
-        byte[] iv = new byte[IV_SIZE];
-        random.nextBytes(iv);
+        // Generate salt and IV
+        byte[] salt = generateSalt();
+        byte[] iv = generateIV();
 
         // Encrypt the plaintext
         Cipher cipher = Cipher.getInstance(CIPHER_ALGORITHM);
@@ -39,10 +36,19 @@ public class AESGCMEncryption {
         System.arraycopy(iv, 0, encryptedData, salt.length, iv.length);
         System.arraycopy(ciphertext, 0, encryptedData, salt.length + iv.length, ciphertext.length);
 
-        return encryptedData;
+        // Encode encrypted data as Base64 string
+        String encryptedString = Base64.getEncoder().encodeToString(encryptedData);
+
+        return encryptedString;
     }
 
-    public static String decrypt(byte[] encryptedData, String keyString) throws Exception {
+    public static String decrypt(String encryptedString, String keyString) throws Exception {
+        byte[] keyBytes = keyString.getBytes(CHARACTER_SET);
+        SecretKeySpec secretKeySpec = new SecretKeySpec(keyBytes, "AES");
+
+        // Decode Base64 string to get encrypted data
+        byte[] encryptedData = Base64.getDecoder().decode(encryptedString);
+
         // Extract salt, iv, and ciphertext from encrypted data
         byte[] salt = new byte[SALT_LENGTH];
         byte[] iv = new byte[IV_SIZE];
@@ -50,12 +56,6 @@ public class AESGCMEncryption {
         System.arraycopy(encryptedData, 0, salt, 0, salt.length);
         System.arraycopy(encryptedData, salt.length, iv, 0, iv.length);
         System.arraycopy(encryptedData, salt.length + iv.length, ciphertext, 0, ciphertext.length);
-
-        // Derive key from password using PBKDF2
-        SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-        KeySpec keySpec = new PBEKeySpec(keyString.toCharArray(), salt, 65536, KEY_SIZE);
-        SecretKey secretKey = keyFactory.generateSecret(keySpec);
-        SecretKeySpec secretKeySpec = new SecretKeySpec(secretKey.getEncoded(), "AES");
 
         // Decrypt the ciphertext
         Cipher cipher = Cipher.getInstance(CIPHER_ALGORITHM);
@@ -66,20 +66,30 @@ public class AESGCMEncryption {
         return new String(plaintextBytes, CHARACTER_SET);
     }
 
-public static void main(String[] args) throws Exception {
-    // 加密和解密的测试数据
+    private static byte[] generateSalt() {
+        byte[] salt = new byte[SALT_LENGTH];
+        SecureRandom random = new SecureRandom();
+        random.nextBytes(salt);
+        return salt;
+    }
+
+    private static byte[] generateIV() {
+        byte[] iv = new byte[IV_SIZE];
+        SecureRandom random = new SecureRandom();
+        random.nextBytes(iv);
+        return iv;
+    }
+    
     String plaintext = "Hello, World!";
-    String keyString = "YourSecretKey123";
+String keyString = "YourKeyString";
 
-    // 加密
-    byte[] encryptedData = encrypt(plaintext, keyString);
+String encryptedString = AESGCMEncryptor.encrypt(plaintext, keyString);
+String decryptedText = AESGCMEncryptor.decrypt(encryptedString, keyString);
 
-    // 解密
-    String decryptedText = decrypt(encryptedData, keyString);
+System.out.println("Original text: " + plaintext);
+System.out.println("Encrypted string: " + encryptedString);
+System.out.println("Decrypted text: " + decryptedText);
+System.out.println("Text before and after encryption match: " + plaintext.equals(decryptedText));
 
-    // 验证加密和解密结果
-    System.out.println("原始文本: " + plaintext);
-    System.out.println("解密后文本: " + decryptedText);
-    System.out.println("加密前后文本是否匹配: " + plaintext.equals(decryptedText));
 }
-}
+
