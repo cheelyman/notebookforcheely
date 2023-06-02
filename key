@@ -29,7 +29,7 @@ public class AESGCMEncryptor {
         cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, gcmParameterSpec);
         byte[] ciphertext = cipher.doFinal(plaintext.getBytes(CHARACTER_SET));
 
-        // Concatenate salt + ciphertext
+        // Concatenate iv + ciphertext
         byte[] encryptedData = new byte[iv.length + ciphertext.length];
         System.arraycopy(iv, 0, encryptedData, 0, iv.length);
         System.arraycopy(ciphertext, 0, encryptedData, iv.length, ciphertext.length);
@@ -47,7 +47,7 @@ public class AESGCMEncryptor {
         // Decode Base64 string to get encrypted data
         byte[] encryptedData = Base64.getDecoder().decode(encryptedString);
 
-        // Extract IV and ciphertext from encrypted data
+        // Extract iv and ciphertext from encrypted data
         byte[] iv = new byte[IV_SIZE];
         byte[] ciphertext = new byte[encryptedData.length - iv.length];
         System.arraycopy(encryptedData, 0, iv, 0, iv.length);
@@ -69,3 +69,4 @@ public class AESGCMEncryptor {
         return iv;
     }
 }
+
