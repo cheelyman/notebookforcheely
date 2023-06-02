@@ -65,4 +65,7 @@ public class RSAEncryptionExample {
     public static String decrypt(PublicKey publicKey, String encryptedData) throws Exception {
         Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
         cipher.init(Cipher.DECRYPT_MODE, publicKey);
-        byte[] decryptedData = cipher
+        byte[] decryptedData = cipher.doFinal(Base64.getDecoder().decode(encryptedData));
+        return new String(decryptedData);
+    }
+}
