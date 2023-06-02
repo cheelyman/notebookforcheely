@@ -1,27 +1,25 @@
-import javax.crypto.Cipher;
-import javax.crypto.SecretKey;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.PBEKeySpec;
-import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
+import javax.crypto.*;
+import javax.crypto.spec.*;
 import java.security.spec.KeySpec;
+import javax.crypto.SecretKeyFactory;
 import java.util.Base64;
 
-public class AESGCMEncryptor {
-    private static final String CIPHER_ALGORITHM = "AES/GCM/NoPadding";
-    private static final int KEY_SIZE = 256;
-    private static final int TAG_LENGTH = 128;
+public class AESGCMEncryption {
     private static final int IV_SIZE = 12;
+    private static final int TAG_LENGTH = 128;
+    private static final int SALT_LENGTH = 16;
     private static final String CHARACTER_SET = "UTF-8";
+    private static final String CIPHER_ALGORITHM = "AES/GCM/NoPadding";
 
-    public static String encrypt(String plaintext, String keyString) throws Exception {
+    public static byte[] encrypt(String plaintext, String keyString) throws Exception {
         byte[] keyBytes = keyString.getBytes(CHARACTER_SET);
         SecretKeySpec secretKeySpec = new SecretKeySpec(keyBytes, "AES");
 
         // Generate IV
-        byte[] iv = generateIV();
+        SecureRandom random = new SecureRandom();
+        byte[] iv = new byte[IV_SIZE];
+        random.nextBytes(iv);
 
         // Encrypt the plaintext
         Cipher cipher = Cipher.getInstance(CIPHER_ALGORITHM);
@@ -34,18 +32,12 @@ public class AESGCMEncryptor {
         System.arraycopy(iv, 0, encryptedData, 0, iv.length);
         System.arraycopy(ciphertext, 0, encryptedData, iv.length, ciphertext.length);
 
-        // Encode encrypted data as Base64 string
-        String encryptedString = Base64.getEncoder().encodeToString(encryptedData);
-
-        return encryptedString;
+        return encryptedData;
     }
 
-    public static String decrypt(String encryptedString, String keyString) throws Exception {
+    public static String decrypt(byte[] encryptedData, String keyString) throws Exception {
         byte[] keyBytes = keyString.getBytes(CHARACTER_SET);
         SecretKeySpec secretKeySpec = new SecretKeySpec(keyBytes, "AES");
-
-        // Decode Base64 string to get encrypted data
-        byte[] encryptedData = Base64.getDecoder().decode(encryptedString);
 
         // Extract iv and ciphertext from encrypted data
         byte[] iv = new byte[IV_SIZE];
@@ -62,11 +54,24 @@ public class AESGCMEncryptor {
         return new String(plaintextBytes, CHARACTER_SET);
     }
 
-    private static byte[] generateIV() {
-        byte[] iv = new byte[IV_SIZE];
+    public static void main(String[] args) throws Exception {
+        // Test encryption and decryption
+        String plaintext = "Hello, World!";
+        String keyString = "YourKeyString";
+
+        // Generate salt and encode it to base64
+        byte[] salt = new byte[SALT_LENGTH];
         SecureRandom random = new SecureRandom();
-        random.nextBytes(iv);
-        return iv;
+        random.nextBytes(salt);
+        String saltBase64 = Base64.getEncoder().encodeToString(salt);
+
+        byte[] encryptedData = encrypt(plaintext, keyString);
+        String decryptedText = decrypt(encryptedData, keyString);
+
+        System.out.println("原始文本: " + plaintext);
+        System.out.println("解密后文本: " + decryptedText);
+        System.out.println("加密前后文本是否匹配: " + plaintext.equals(decryptedText));
     }
 }
+
 
