@@ -74,4 +74,21 @@ public class SymmetricEncryption {
         SecretKey secretKey = keyFactory.generateSecret(keySpec);
         return new SecretKeySpec(secretKey.getEncoded(), "AES");
     }
+
+    public static void main(String[] args) {
+        try {
+            String secretKey = "your_secret_key";
+            String originalData = "Hello, World!";
+
+            // 加密数据
+            String encryptedData = SymmetricEncryption.encrypt(originalData, secretKey);
+            System.out.println("Encrypted Data: " + encryptedData);
+
+            // 解密数据
+            String decryptedData = SymmetricEncryption.decrypt(encryptedData, secretKey);
+            System.out.println("Decrypted Data: " + decryptedData);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 }
