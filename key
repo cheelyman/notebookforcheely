@@ -1,97 +1,88 @@
-import javax.crypto.*;
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
-import java.security.*;
+import java.security.SecureRandom;
+import java.util.Base64;
 
+/**
+ * AES encryption and decryption example.
+ */
 public class AESEncryptionExample {
-    private static final int KEY_SIZE = 256; // 指定密钥长度为256位
 
-    public static void main(String[] args) {
-        try {
-            // 生成密钥
-            SecretKey secretKey = generateKey();
-
-            // 原始数据
-            String originalData = "Hello, World!";
-            System.out.println("原始数据: " + originalData);
-
-            // 加密数据
-            byte[] encryptedData = encrypt(originalData, secretKey);
-            System.out.println("加密后的数据: " + bytesToHexString(encryptedData));
-
-            // 解密数据
-            String decryptedData = decrypt(encryptedData, secretKey);
-            System.out.println("解密后的数据: " + decryptedData);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    // 生成密钥
-    private static SecretKey generateKey() throws NoSuchAlgorithmException {
+    /**
+     * Generates a 256-bit AES key.
+     *
+     * @return The generated key.
+     * @throws Exception If an exception occurs during key generation.
+     */
+    private static SecretKey generateAESKey() throws Exception {
         KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
-        keyGenerator.init(KEY_SIZE);
+        keyGenerator.init(256);
         return keyGenerator.generateKey();
     }
 
-    // 加密数据
-    private static byte[] encrypt(String data, SecretKey secretKey) throws NoSuchAlgorithmException,
-            NoSuchPaddingException, InvalidKeyException, InvalidAlgorithmParameterException,
-            IllegalBlockSizeException, BadPaddingException {
-        // 生成随机IV向量
-        byte[] iv = generateIV();
-
-        // 创建加密器
+    /**
+     * Encrypts data using AES-GCM mode.
+     *
+     * @param data The data to encrypt.
+     * @param key The encryption key.
+     * @param iv The initialization vector.
+     * @param salt The salt value.
+     * @return The encrypted data, in the form of a Base64-encoded string.
+     * @throws Exception If an exception occurs during encryption.
+     */
+    private static String encrypt(String data, SecretKey key, byte[] iv, byte[] salt) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         GCMParameterSpec parameterSpec = new GCMParameterSpec(128, iv);
-        cipher.init(Cipher.ENCRYPT_MODE, secretKey, parameterSpec);
-
-        // 执行加密
+        SecretKeySpec secretKeySpec = new SecretKeySpec(key.getEncoded(), "AES");
+        cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, parameterSpec);
         byte[] encryptedBytes = cipher.doFinal(data.getBytes(StandardCharsets.UTF_8));
-
-        // 组合IV向量和加密数据
-        byte[] result = new byte[iv.length + encryptedBytes.length];
-        System.arraycopy(iv, 0, result, 0, iv.length);
-        System.arraycopy(encryptedBytes, 0, result, iv.length, encryptedBytes.length);
-
-        return result;
+        return Base64.getEncoder().encodeToString(encryptedBytes);
     }
 
-    // 解密数据
-    private static String decrypt(byte[] data, SecretKey secretKey) throws NoSuchAlgorithmException,
-            NoSuchPaddingException, InvalidKeyException, InvalidAlgorithmParameterException,
-            IllegalBlockSizeException, BadPaddingException {
-        // 分离IV向量和加密数据
-        byte[] iv = new byte[12];
-        byte[] encryptedData = new byte[data.length - 12];
-        System.arraycopy(data, 0, iv, 0, 12);
-        System.arraycopy(data, 12, encryptedData, 0, encryptedData.length);
-
-        // 创建解密器
+    /**
+     * Decrypts data using AES-GCM mode.
+     *
+     * @param encryptedData The encrypted data, in the form of a Base64-encoded string.
+     * @param key The decryption key.
+     * @param iv The initialization vector.
+     * @param salt The salt value.
+     * @return The decrypted data.
+     * @throws Exception If an exception occurs during decryption.
+     */
+    private static String decrypt(String encryptedData, SecretKey key, byte[] iv, byte[] salt) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         GCMParameterSpec parameterSpec = new GCMParameterSpec(128, iv);
-        cipher.init(Cipher.DECRYPT_MODE, secretKey, parameterSpec);
-
-        // 执行解密
-        byte[] decryptedBytes = cipher.doFinal(encryptedData);
+        SecretKeySpec secretKeySpec = new SecretKeySpec(key.getEncoded(), "AES");
+        cipher.init(Cipher.DECRYPT_MODE, secretKeySpec, parameterSpec);
+        byte[] encryptedBytes = Base64.getDecoder().decode(encryptedData);
+        byte[] decryptedBytes = cipher.doFinal(encryptedBytes);
         return new String(decryptedBytes, StandardCharsets.UTF_8);
     }
 
-    // 生成随机IV向量
-    private static byte[] generateIV() throws NoSuchAlgorithmException {
-        SecureRandom random = SecureRandom.getInstanceStrong();
+    public static void main(String[] args) throws Exception {
+        String plaintext = "Hello, AES!";
+        // Generate AES key
+        SecretKey key = generateAESKey();
+
+        // Generate initialization vector (IV)
+        SecureRandom random = new SecureRandom();
         byte[] iv = new byte[12];
         random.nextBytes(iv);
-        return iv;
-    }
 
-    // 将字节数组转换为十六进制字符串
-    private static String bytesToHexString(byte[] bytes) {
-        StringBuilder sb = new StringBuilder();
-        for (byte b : bytes) {
-            sb.append(String.format("%02X", b));
-        }
-        return sb.toString();
+        // Generate salt
+        byte[] salt = new byte[16];
+        random.nextBytes(salt);
+
+        // Encrypt the plaintext
+        String encryptedData = encrypt(plaintext, key, iv, salt);
+        System.out.println("Encrypted data: " + encryptedData);
+
+        // Decrypt the encrypted data
+        String decryptedData = decrypt(encryptedData, key, iv, salt);
+        System.out.println("Decrypted data: " + decryptedData);
     }
 }
