@@ -79,17 +79,4 @@ public class AESGCMEncryptor {
         random.nextBytes(iv);
         return iv;
     }
-    
-    String plaintext = "Hello, World!";
-String keyString = "YourKeyString";
-
-String encryptedString = AESGCMEncryptor.encrypt(plaintext, keyString);
-String decryptedText = AESGCMEncryptor.decrypt(encryptedString, keyString);
-
-System.out.println("Original text: " + plaintext);
-System.out.println("Encrypted string: " + encryptedString);
-System.out.println("Decrypted text: " + decryptedText);
-System.out.println("Text before and after encryption match: " + plaintext.equals(decryptedText));
-
 }
-
