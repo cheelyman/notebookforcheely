@@ -1,105 +1,43 @@
-import javax.crypto.*;
-import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
-import java.security.*;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 
-public class AESEncryptionExample {
-    private static final String ENCRYPTION_ALGORITHM = "AES/GCM/NoPadding";
-    private static final int TAG_LENGTH_BITS = 128;
-    private static final int IV_LENGTH_BYTES = 12;
-    private static final int SALT_LENGTH_BYTES = 16;
+public class HashingExample {
+    private static final String HASH_ALGORITHM = "HmacSHA256";
 
-    public static String encrypt(String plainText, String keyString) throws Exception {
-        // Generate salt
-        byte[] salt = generateSalt();
+    public static String calculateHash(String data, String symmetricKey) throws NoSuchAlgorithmException, InvalidKeyException {
+        // Convert symmetric key to bytes
+        byte[] keyBytes = symmetricKey.getBytes(StandardCharsets.UTF_8);
 
-        // Generate key from keyString
-        SecretKey secretKey = generateKey(keyString);
+        // Create SecretKeySpec with the key bytes and algorithm
+        SecretKeySpec keySpec = new SecretKeySpec(keyBytes, HASH_ALGORITHM);
 
-        // Generate initialization vector (IV)
-        byte[] iv = generateInitializationVector();
+        // Initialize HMAC with the key spec
+        Mac mac = Mac.getInstance(HASH_ALGORITHM);
+        mac.init(keySpec);
 
-        // Create cipher and initialize with encryption mode
-        Cipher cipher = Cipher.getInstance(ENCRYPTION_ALGORITHM);
-        cipher.init(Cipher.ENCRYPT_MODE, secretKey, new GCMParameterSpec(TAG_LENGTH_BITS, iv));
+        // Calculate the hash
+        byte[] hashBytes = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
 
-        // Encrypt the plain text
-        byte[] encryptedText = cipher.doFinal(plainText.getBytes(StandardCharsets.UTF_8));
-
-        // Combine salt, IV, and encrypted text
-        byte[] combined = new byte[SALT_LENGTH_BYTES + IV_LENGTH_BYTES + encryptedText.length];
-        System.arraycopy(salt, 0, combined, 0, SALT_LENGTH_BYTES);
-        System.arraycopy(iv, 0, combined, SALT_LENGTH_BYTES, IV_LENGTH_BYTES);
-        System.arraycopy(encryptedText, 0, combined, SALT_LENGTH_BYTES + IV_LENGTH_BYTES, encryptedText.length);
-
-        // Return the Base64 encoded ciphertext
-        return Base64.getEncoder().encodeToString(combined);
-    }
-
-    public static String decrypt(String encryptedText, String keyString) throws Exception {
-        // Decode the Base64 encoded ciphertext
-        byte[] combined = Base64.getDecoder().decode(encryptedText);
-
-        // Extract salt, IV, and encrypted text from the combined byte array
-        byte[] salt = new byte[SALT_LENGTH_BYTES];
-        byte[] iv = new byte[IV_LENGTH_BYTES];
-        byte[] ciphertext = new byte[combined.length - SALT_LENGTH_BYTES - IV_LENGTH_BYTES];
-        System.arraycopy(combined, 0, salt, 0, SALT_LENGTH_BYTES);
-        System.arraycopy(combined, SALT_LENGTH_BYTES, iv, 0, IV_LENGTH_BYTES);
-        System.arraycopy(combined, SALT_LENGTH_BYTES + IV_LENGTH_BYTES, ciphertext, 0, ciphertext.length);
-
-        // Generate key from keyString
-        SecretKey secretKey = generateKey(keyString);
-
-        // Create cipher and initialize with decryption mode
-        Cipher cipher = Cipher.getInstance(ENCRYPTION_ALGORITHM);
-        cipher.init(Cipher.DECRYPT_MODE, secretKey, new GCMParameterSpec(TAG_LENGTH_BITS, iv));
-
-        // Decrypt the ciphertext
-        byte[] decryptedText = cipher.doFinal(ciphertext);
-
-        // Return the decrypted text as a String
-        return new String(decryptedText, StandardCharsets.UTF_8);
-    }
-
-    private static SecretKey generateKey(String keyString) throws NoSuchAlgorithmException {
-        byte[] keyBytes = keyString.getBytes(StandardCharsets.UTF_8);
-        MessageDigest sha = MessageDigest.getInstance("SHA-256");
-        byte[] hashedKeyBytes = sha.digest(keyBytes);
-        return new SecretKeySpec(hashedKeyBytes, "AES");
-    }
-
-    private static byte[] generateSalt() {
-        SecureRandom random = new SecureRandom();
-        byte[] salt = new byte[SALT_LENGTH_BYTES];
-        random.nextBytes(salt);
-        return salt;
-    }
-
-    private static byte[] generateInitializationVector() {
-        SecureRandom random = new SecureRandom();
-        byte[] iv = new byte[IV_LENGTH_BYTES];
-        random.nextBytes(iv);
-        return iv;
+        // Return the Base64 encoded hash
+        return Base64.getEncoder().encodeToString(hashBytes);
     }
 
     public static void main(String[] args) {
         try {
-            String keyString = "Your256BitCryptographicKey";
-            String plainText = "Hello, World!";
+            String symmetricKey = "YourSymmetricKey";
+            String data = "Hello, World!";
 
-            // Encryption
-            String encryptedText = encrypt(plainText, keyString);
-            System.out.println("Encrypted Text: " + encryptedText);
-
-            // Decryption
-            String decryptedText = decrypt(encryptedText, keyString);
-            System.out.println("Decrypted Text: " + decryptedText);
+            // Calculate the hash
+            String hash = calculateHash(data, symmetricKey);
+            System.out.println("Hash: " + hash);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 }
+
 
