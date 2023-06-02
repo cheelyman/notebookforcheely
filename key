@@ -15,12 +15,12 @@ public class SymmetricEncryption {
     private static final String CIPHER_ALGORITHM = "AES/GCM/NoPadding";
     private static final String SECRET_KEY_ALGORITHM = "PBKDF2WithHmacSHA512";
     private static final int ITERATION_COUNT = 65536;
-    private static final int KEY_LENGTH = 32;
-    private static final String HASH_ALGORITHM = "SHA-256";
+    private static final int KEY_LENGTH = 256;
+    private static final int KEY_SIZE_IN_BYTES = KEY_LENGTH / 8;
 
-    public static String encrypt(String data, String secret) throws Exception {
+    public static String encrypt(String data, String password) throws Exception {
         byte[] salt = generateSalt();
-        SecretKey secretKey = generateSecretKey(secret, salt);
+        SecretKey secretKey = generateSecretKey(password, salt);
 
         SecureRandom random = new SecureRandom();
         byte[] iv = new byte[IV_LENGTH];
@@ -31,27 +31,28 @@ public class SymmetricEncryption {
         cipher.init(Cipher.ENCRYPT_MODE, secretKey, parameterSpec);
 
         byte[] encryptedData = cipher.doFinal(data.getBytes(StandardCharsets.UTF_8));
-        byte[] encrypted = new byte[salt.length + iv.length + encryptedData.length];
-        System.arraycopy(salt, 0, encrypted, 0, salt.length);
-        System.arraycopy(iv, 0, encrypted, salt.length, iv.length);
-        System.arraycopy(encryptedData, 0, encrypted, salt.length + iv.length, encryptedData.length);
 
-        return Base64.getEncoder().encodeToString(encrypted);
+        byte[] combined = new byte[salt.length + iv.length + encryptedData.length];
+        System.arraycopy(salt, 0, combined, 0, salt.length);
+        System.arraycopy(iv, 0, combined, salt.length, iv.length);
+        System.arraycopy(encryptedData, 0, combined, salt.length + iv.length, encryptedData.length);
+
+        return Base64.getEncoder().encodeToString(combined);
     }
 
-    public static String decrypt(String encryptedData, String secret) throws Exception {
-        byte[] encrypted = Base64.getDecoder().decode(encryptedData);
+    public static String decrypt(String encryptedData, String password) throws Exception {
+        byte[] combined = Base64.getDecoder().decode(encryptedData);
 
         byte[] salt = new byte[SALT_LENGTH];
-        System.arraycopy(encrypted, 0, salt, 0, salt.length);
+        System.arraycopy(combined, 0, salt, 0, salt.length);
 
         byte[] iv = new byte[IV_LENGTH];
-        System.arraycopy(encrypted, salt.length, iv, 0, iv.length);
+        System.arraycopy(combined, salt.length, iv, 0, iv.length);
 
-        byte[] data = new byte[encrypted.length - salt.length - iv.length];
-        System.arraycopy(encrypted, salt.length + iv.length, data, 0, data.length);
+        byte[] data = new byte[combined.length - salt.length - iv.length];
+        System.arraycopy(combined, salt.length + iv.length, data, 0, data.length);
 
-        SecretKey secretKey = generateSecretKey(secret, salt);
+        SecretKey secretKey = generateSecretKey(password, salt);
 
         Cipher cipher = Cipher.getInstance(CIPHER_ALGORITHM);
         GCMParameterSpec parameterSpec = new GCMParameterSpec(TAG_LENGTH * 8, iv);
@@ -68,24 +69,24 @@ public class SymmetricEncryption {
         return salt;
     }
 
-    private static SecretKey generateSecretKey(String secret, byte[] salt) throws Exception {
-        SecretKeyFactory keyFactory = SecretKeyFactory.getInstance(SECRET_KEY_ALGORITHM);
-        PBEKeySpec keySpec = new PBEKeySpec(secret.toCharArray(), salt, ITERATION_COUNT, KEY_LENGTH);
-        SecretKey secretKey = keyFactory.generateSecret(keySpec);
+    private static SecretKey generateSecretKey(String password, byte[] salt) throws Exception {
+        SecretKeyFactory factory = SecretKeyFactory.getInstance(SECRET_KEY_ALGORITHM);
+        PBEKeySpec keySpec = new PBEKeySpec(password.toCharArray(), salt, ITERATION_COUNT, KEY_SIZE_IN_BYTES);
+        SecretKey secretKey = factory.generateSecret(keySpec);
         return new SecretKeySpec(secretKey.getEncoded(), "AES");
     }
 
     public static void main(String[] args) {
         try {
-            String secretKey = "your_secret_key";
+            String password = "your_password";
             String originalData = "Hello, World!";
 
             // 加密数据
-            String encryptedData = SymmetricEncryption.encrypt(originalData, secretKey);
+            String encryptedData = SymmetricEncryption.encrypt(originalData, password);
             System.out.println("Encrypted Data: " + encryptedData);
 
             // 解密数据
-            String decryptedData = SymmetricEncryption.decrypt(encryptedData, secretKey);
+            String decryptedData = SymmetricEncryption.decrypt(encryptedData, password);
             System.out.println("Decrypted Data: " + decryptedData);
         } catch (Exception e) {
             e.printStackTrace();
