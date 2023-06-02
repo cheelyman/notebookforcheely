@@ -1,7 +1,4 @@
-package com.github.gzuliyujiang.rsautils;
-
 import javax.crypto.Cipher;
-import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
@@ -11,89 +8,83 @@ import java.security.SecureRandom;
 import java.security.spec.KeySpec;
 import java.util.Base64;
 
-public class AESEncryptionExample {
-    private static final int KEY_SIZE = 256; // 密钥大小（以位为单位）
-    private static final int IV_SIZE = 12; // 初始化向量大小（以字节为单位）
-    private static final int TAG_LENGTH = 128; // GCM 标签长度（以位为单位）
-    private static final int SALT_LENGTH = 16; // SALT 长度（以字节为单位）
-    private static final String ENCRYPTION_ALGORITHM = "AES/GCM/NoPadding"; // 加密算法
+public class AESGCMWithPBKDF2Example {
+    private static final int AES_KEY_SIZE = 256;  // AES key size in bits
+    private static final int GCM_IV_LENGTH = 12;  // GCM IV length in bytes
+    private static final int GCM_TAG_LENGTH = 128; // GCM tag length in bits
+    private static final int SALT_LENGTH = 16; // Salt length in bytes
 
-    public static void main(String[] args) {
-        try {
-            String plaintext = "Hello, World!"; // 要加密的明文
+    public static void main(String[] args) throws Exception {
+        // The password you want to use
+        String password = "your_password_here";
 
-            // 生成随机的Salt
-            byte[] salt = generateSalt();
-
-            // 生成密钥
-            SecretKey secretKey = generateSecretKey("password", salt);
-
-            // 加密
-            byte[] ciphertext = encrypt(plaintext, secretKey);
-
-            // 解密
-            String decryptedText = decrypt(ciphertext, secretKey);
-
-            System.out.println("Plaintext: " + plaintext);
-            System.out.println("Ciphertext: " + Base64.getEncoder().encodeToString(ciphertext));
-            System.out.println("Decrypted text: " + decryptedText);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    // 生成随机的Salt
-    private static byte[] generateSalt() {
-        byte[] salt = new byte[SALT_LENGTH];
+        // Generate a random salt
         SecureRandom random = new SecureRandom();
+        byte[] salt = new byte[SALT_LENGTH];
         random.nextBytes(salt);
-        return salt;
+
+        // Generate the key from the password and salt
+        SecretKeySpec keySpec = getKeyFromPassword(password, salt);
+
+        // Generate a random IV
+        byte[] iv = new byte[GCM_IV_LENGTH];
+        random.nextBytes(iv);
+
+        // The data you want to encrypt
+        String data = "Hello, World!";
+
+        // Encrypt the data
+        String encryptedData = encrypt(keySpec, iv, data);
+
+        // The encrypted data string includes the salt, iv, and encrypted data
+        // Decrypt the data
+        String decryptedData = decrypt(password, encryptedData);
+
+        System.out.println("Decrypted data: " + decryptedData);
     }
 
-    // 生成密钥
-    private static SecretKey generateSecretKey(String password, byte[] salt) throws Exception {
+    public static SecretKeySpec getKeyFromPassword(String password, byte[] salt) throws Exception {
         SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 65536, KEY_SIZE);
-        SecretKey tmp = factory.generateSecret(spec);
-        return new SecretKeySpec(tmp.getEncoded(), "AES");
+        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 10000, AES_KEY_SIZE);
+        byte[] secretKey = factory.generateSecret(spec).getEncoded();
+        return new SecretKeySpec(secretKey, "AES");
     }
 
-    // 加密
-    private static byte[] encrypt(String plaintext, SecretKey secretKey) throws Exception {
-        byte[] iv = generateInitializationVector();
-        GCMParameterSpec parameterSpec = new GCMParameterSpec(TAG_LENGTH, iv);
-        Cipher cipher = Cipher.getInstance(ENCRYPTION_ALGORITHM);
-        cipher.init(Cipher.ENCRYPT_MODE, secretKey, parameterSpec);
-        byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
+    public static String encrypt(SecretKeySpec key, byte[] iv, String data) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
+        cipher.init(Cipher.ENCRYPT_MODE, key, spec);
+        byte[] encryptedData = cipher.doFinal(data.getBytes(StandardCharsets.UTF_8));
 
-        // 将 IV 与密文合并
-        byte[] combined = new byte[iv.length + ciphertext.length];
-        System.arraycopy(iv, 0, combined, 0, iv.length);
-        System.arraycopy(ciphertext, 0, combined, iv.length, ciphertext.length);
+        // Concatenate salt, iv and encrypted data
+        byte[] combined = new byte[SALT_LENGTH + GCM_IV_LENGTH + encryptedData.length];
+        System.arraycopy(key.getEncoded(), 0, combined, 0, SALT_LENGTH);
+        System.arraycopy(iv, 0, combined, SALT_LENGTH, GCM_IV_LENGTH);
+        System.arraycopy(encryptedData, 0, combined, SALT_LENGTH + GCM_IV_LENGTH, encryptedData.length);
 
-        return combined;
+        return Base64.getEncoder().encodeToString(combined);
     }
 
-    // 解密
-    private static String decrypt(byte[] ciphertext, SecretKey secretKey) throws Exception {
-        byte[] iv = new byte[IV_SIZE];
-        byte[] encryptedData = new byte[ciphertext.length - IV_SIZE];
-        System.arraycopy(ciphertext, 0, iv, 0, IV_SIZE);
-        System.arraycopy(ciphertext, IV_SIZE, encryptedData, 0, ciphertext.length - IV_SIZE);
+    public static String decrypt(String password, String encryptedData) throws Exception {
+        // Decode the base64 encoded string
+        byte[] decodedData = Base64.getDecoder().decode(encryptedData);
 
-        GCMParameterSpec parameterSpec = new GCMParameterSpec(TAG_LENGTH, iv);
-        Cipher cipher = Cipher.getInstance(ENCRYPTION_ALGORITHM);
-        cipher.init(Cipher.DECRYPT_MODE, secretKey, parameterSpec);
-        byte[] decryptedData = cipher.doFinal(encryptedData);
+        // Extract the salt and iv from the decoded data
+        byte[] salt = new byte[SALT_LENGTH];
+        System.arraycopy(decodedData, 0, salt, 0, SALT_LENGTH);
+
+        byte[] iv = new byte[GCM_IV_LENGTH];
+        System.arraycopy(decodedData, SALT_LENGTH, iv, 0, GCM_IV_LENGTH);
+
+        // Re-create the key from the password and salt
+        SecretKeySpec key = getKeyFromPassword(password, salt);
+
+        // Decrypt the data
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
+        cipher.init(Cipher.DECRYPT_MODE, key, spec);
+
+        byte[] decryptedData = cipher.doFinal(decodedData, SALT_LENGTH + GCM_IV_LENGTH, decodedData.length - SALT_LENGTH - GCM_IV_LENGTH);
         return new String(decryptedData, StandardCharsets.UTF_8);
     }
-
-    // 生成随机的初始化向量
-    private static byte[] generateInitializationVector() {
-        byte[] iv = new byte[IV_SIZE];
-        SecureRandom random = new SecureRandom();
-        random.nextBytes(iv);
-        return iv;
-    }
 }
-
