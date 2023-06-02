@@ -13,26 +13,26 @@ public class AESGCMEncryptor {
     private static final String CIPHER_ALGORITHM = "AES/GCM/NoPadding";
     private static final int KEY_SIZE = 256;
     private static final int TAG_LENGTH = 128;
-    private static final int SALT_LENGTH = 16;
+    private static final int IV_SIZE = 12;
     private static final String CHARACTER_SET = "UTF-8";
 
     public static String encrypt(String plaintext, String keyString) throws Exception {
         byte[] keyBytes = keyString.getBytes(CHARACTER_SET);
         SecretKeySpec secretKeySpec = new SecretKeySpec(keyBytes, "AES");
 
-        // Generate salt
-        byte[] salt = generateSalt();
+        // Generate IV
+        byte[] iv = generateIV();
 
         // Encrypt the plaintext
         Cipher cipher = Cipher.getInstance(CIPHER_ALGORITHM);
-        GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(TAG_LENGTH, salt);
+        GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(TAG_LENGTH, iv);
         cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, gcmParameterSpec);
         byte[] ciphertext = cipher.doFinal(plaintext.getBytes(CHARACTER_SET));
 
         // Concatenate salt + ciphertext
-        byte[] encryptedData = new byte[salt.length + ciphertext.length];
-        System.arraycopy(salt, 0, encryptedData, 0, salt.length);
-        System.arraycopy(ciphertext, 0, encryptedData, salt.length, ciphertext.length);
+        byte[] encryptedData = new byte[iv.length + ciphertext.length];
+        System.arraycopy(iv, 0, encryptedData, 0, iv.length);
+        System.arraycopy(ciphertext, 0, encryptedData, iv.length, ciphertext.length);
 
         // Encode encrypted data as Base64 string
         String encryptedString = Base64.getEncoder().encodeToString(encryptedData);
@@ -47,25 +47,25 @@ public class AESGCMEncryptor {
         // Decode Base64 string to get encrypted data
         byte[] encryptedData = Base64.getDecoder().decode(encryptedString);
 
-        // Extract salt and ciphertext from encrypted data
-        byte[] salt = new byte[SALT_LENGTH];
-        byte[] ciphertext = new byte[encryptedData.length - salt.length];
-        System.arraycopy(encryptedData, 0, salt, 0, salt.length);
-        System.arraycopy(encryptedData, salt.length, ciphertext, 0, ciphertext.length);
+        // Extract IV and ciphertext from encrypted data
+        byte[] iv = new byte[IV_SIZE];
+        byte[] ciphertext = new byte[encryptedData.length - iv.length];
+        System.arraycopy(encryptedData, 0, iv, 0, iv.length);
+        System.arraycopy(encryptedData, iv.length, ciphertext, 0, ciphertext.length);
 
         // Decrypt the ciphertext
         Cipher cipher = Cipher.getInstance(CIPHER_ALGORITHM);
-        GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(TAG_LENGTH, salt);
+        GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(TAG_LENGTH, iv);
         cipher.init(Cipher.DECRYPT_MODE, secretKeySpec, gcmParameterSpec);
         byte[] plaintextBytes = cipher.doFinal(ciphertext);
 
         return new String(plaintextBytes, CHARACTER_SET);
     }
 
-    private static byte[] generateSalt() {
-        byte[] salt = new byte[SALT_LENGTH];
+    private static byte[] generateIV() {
+        byte[] iv = new byte[IV_SIZE];
         SecureRandom random = new SecureRandom();
-        random.nextBytes(salt);
-        return salt;
+        random.nextBytes(iv);
+        return iv;
     }
 }
