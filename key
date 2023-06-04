@@ -51,3 +51,13 @@ public class AESGCMUtil {
         return decryptedText;
     }
 }
+
+byte[] iv = AESGCMUtil.generateIV();
+SecretKey key = AESGCMUtil.deriveKey(PASSWORD);
+
+String plaintext = "This is a test.";
+byte[] cipherText = AESGCMUtil.encrypt(plaintext.getBytes(StandardCharsets.UTF_8), key, iv);
+byte[] decryptedText = AESGCMUtil.decrypt(cipherText, key, iv);
+
+System.out.println(new String(decryptedText, StandardCharsets.UTF_8));
+
