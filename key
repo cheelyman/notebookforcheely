@@ -1,18 +1,27 @@
 import javax.crypto.*;
 import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.KeySpec;
 import java.util.Base64;
 
 public class AESGCMExample {
     private static final int TAG_LENGTH_BIT = 128;
     private static final int IV_LENGTH_BYTE = 12;
     private static final int SALT_LENGTH_BYTE = 16;
+    private static final int ITERATIONS = 65536;
+    private static final int KEY_LENGTH_BIT = 256;
+    private static final String PASSWORD = "abcabc";
 
-    private static SecretKey getAESKeyFromPassword(String password) throws NoSuchAlgorithmException {
-        return new SecretKeySpec(password.getBytes(), "AES");
+    private static SecretKey deriveKey(String password, byte[] salt) throws NoSuchAlgorithmException, InvalidKeySpecException {
+        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, ITERATIONS, KEY_LENGTH_BIT);
+        SecretKey tmp = factory.generateSecret(spec);
+        return new SecretKeySpec(tmp.getEncoded(), "AES");
     }
 
     private static byte[] getRandomNonce(int numBytes) {
@@ -23,15 +32,13 @@ public class AESGCMExample {
 
     private static byte[] encrypt(String plaintext, SecretKey aesKey) throws GeneralSecurityException {
         byte[] iv = getRandomNonce(IV_LENGTH_BYTE);
-        byte[] salt = getRandomNonce(SALT_LENGTH_BYTE);
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         GCMParameterSpec parameterSpec = new GCMParameterSpec(TAG_LENGTH_BIT, iv);
         cipher.init(Cipher.ENCRYPT_MODE, aesKey, parameterSpec);
 
         byte[] cipherText = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
 
-        ByteBuffer byteBuffer = ByteBuffer.allocate(iv.length + salt.length + cipherText.length);
-        byteBuffer.put(salt);
+        ByteBuffer byteBuffer = ByteBuffer.allocate(IV_LENGTH_BYTE + cipherText.length);
         byteBuffer.put(iv);
         byteBuffer.put(cipherText);
         return byteBuffer.array();
@@ -39,9 +46,6 @@ public class AESGCMExample {
 
     private static String decrypt(byte[] cipherMessage, SecretKey aesKey) throws GeneralSecurityException {
         ByteBuffer byteBuffer = ByteBuffer.wrap(cipherMessage);
-
-        byte[] salt = new byte[SALT_LENGTH_BYTE];
-        byteBuffer.get(salt);
 
         byte[] iv = new byte[IV_LENGTH_BYTE];
         byteBuffer.get(iv);
@@ -59,14 +63,16 @@ public class AESGCMExample {
 
     public static void main(String[] args) throws Exception {
         String plaintext = "Hello, World!";
-        String password = "abcabc";
 
-        SecretKey aesKey = getAESKeyFromPassword(password);
+        byte[] salt = getRandomNonce(SALT_LENGTH_BYTE);
+        SecretKey aesKey = deriveKey(PASSWORD, salt);
 
         byte[] cipherMessage = encrypt(plaintext, aesKey);
         String encryptedText = Base64.getEncoder().encodeToString(cipherMessage);
         System.out.println("Encrypted Text: " + encryptedText);
 
         byte[] cipherText2 = Base64.getDecoder().decode(encryptedText);
-        String decryptedText = decrypt(cipherText2,
-
+        String decryptedText = decrypt(cipherText2, aesKey);
+        System.out.println("Decrypted Text: " + decryptedText);
+    }
+}
