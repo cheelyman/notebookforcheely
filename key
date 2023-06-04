@@ -9,49 +9,51 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
 import java.util.Base64;
 
-public class AESGCMExample {
+public class AESGCMUtil {
     private static final int TAG_LENGTH_BIT = 128;
     private static final int IV_LENGTH_BYTE = 12;
     private static final int SALT_LENGTH_BYTE = 16;
     private static final int ITERATIONS = 65536;
     private static final int KEY_LENGTH_BIT = 256;
-    private static final String PASSWORD = "abcabc";
 
-    private static SecretKey deriveKey(String password, byte[] salt) throws NoSuchAlgorithmException, InvalidKeySpecException {
+    public static SecretKey deriveKey(String password, byte[] salt) throws NoSuchAlgorithmException, InvalidKeySpecException {
         SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
         KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, ITERATIONS, KEY_LENGTH_BIT);
         SecretKey tmp = factory.generateSecret(spec);
         return new SecretKeySpec(tmp.getEncoded(), "AES");
     }
 
-    private static byte[] getRandomNonce(int numBytes) {
-        byte[] nonce = new byte[numBytes];
-        new SecureRandom().nextBytes(nonce);
-        return nonce;
-    }
-
-    private static byte[] encrypt(String plaintext, SecretKey aesKey) throws GeneralSecurityException {
+    public static byte[] encrypt(String plaintext, String password) throws GeneralSecurityException {
         byte[] iv = getRandomNonce(IV_LENGTH_BYTE);
+        byte[] salt = getRandomNonce(SALT_LENGTH_BYTE);
+        SecretKey aesKey = deriveKey(password, salt);
+
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         GCMParameterSpec parameterSpec = new GCMParameterSpec(TAG_LENGTH_BIT, iv);
         cipher.init(Cipher.ENCRYPT_MODE, aesKey, parameterSpec);
 
         byte[] cipherText = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
 
-        ByteBuffer byteBuffer = ByteBuffer.allocate(IV_LENGTH_BYTE + cipherText.length);
+        ByteBuffer byteBuffer = ByteBuffer.allocate(SALT_LENGTH_BYTE + IV_LENGTH_BYTE + cipherText.length);
+        byteBuffer.put(salt);
         byteBuffer.put(iv);
         byteBuffer.put(cipherText);
         return byteBuffer.array();
     }
 
-    private static String decrypt(byte[] cipherMessage, SecretKey aesKey) throws GeneralSecurityException {
+    public static String decrypt(byte[] cipherMessage, String password) throws GeneralSecurityException {
         ByteBuffer byteBuffer = ByteBuffer.wrap(cipherMessage);
+
+        byte[] salt = new byte[SALT_LENGTH_BYTE];
+        byteBuffer.get(salt);
 
         byte[] iv = new byte[IV_LENGTH_BYTE];
         byteBuffer.get(iv);
 
         byte[] cipherText = new byte[byteBuffer.remaining()];
         byteBuffer.get(cipherText);
+
+        SecretKey aesKey = deriveKey(password, salt);
 
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         GCMParameterSpec parameterSpec = new GCMParameterSpec(TAG_LENGTH_BIT, iv);
@@ -61,18 +63,23 @@ public class AESGCMExample {
         return new String(plainText, StandardCharsets.UTF_8);
     }
 
-    public static void main(String[] args) throws Exception {
+    private static byte[] getRandomNonce(int numBytes) {
+        byte[] nonce = new byte[numBytes];
+        new SecureRandom().nextBytes(nonce);
+        return nonce;
+    }
+}
+public class Main {
+    public static void main(String[] args) throws NoSuchAlgorithmException, InvalidKeySpecException, GeneralSecurityException {
         String plaintext = "Hello, World!";
+        String password = "abcabc";
 
-        byte[] salt = getRandomNonce(SALT_LENGTH_BYTE);
-        SecretKey aesKey = deriveKey(PASSWORD, salt);
-
-        byte[] cipherMessage = encrypt(plaintext, aesKey);
+        byte[] cipherMessage = AESGCMUtil.encrypt(plaintext, password);
         String encryptedText = Base64.getEncoder().encodeToString(cipherMessage);
         System.out.println("Encrypted Text: " + encryptedText);
 
-        byte[] cipherText2 = Base64.getDecoder().decode(encryptedText);
-        String decryptedText = decrypt(cipherText2, aesKey);
+        byte[] cipherText = Base64.getDecoder().decode(encryptedText);
+        String decryptedText = AESGCMUtil.decrypt(cipherText, password);
         System.out.println("Decrypted Text: " + decryptedText);
     }
 }
