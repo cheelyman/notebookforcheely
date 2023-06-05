@@ -10,7 +10,7 @@ public class Main {
     private static final int GCM_IV_LENGTH = 12;
     private static final int GCM_TAG_LENGTH = 128;
 
-    public static String encrypt(String plaintext, SecretKey key) throws Exception {
+    public static byte[] encrypt(String plaintext, SecretKey key) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         final byte[] nonce = new byte[GCM_IV_LENGTH];
         SecureRandom random = new SecureRandom();
@@ -18,14 +18,22 @@ public class Main {
         GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, nonce);
         cipher.init(Cipher.ENCRYPT_MODE, key, spec);
         byte[] cipherText = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
-        return Base64.getEncoder().encodeToString(cipherText);
+        // combining nonce and cipher text
+        byte[] cipherWithNonce = new byte[nonce.length + cipherText.length];
+        System.arraycopy(nonce, 0, cipherWithNonce, 0, nonce.length);
+        System.arraycopy(cipherText, 0, cipherWithNonce, nonce.length, cipherText.length);
+        return cipherWithNonce;
     }
 
-    public static String decrypt(String cipherText, SecretKey key, byte[] nonce) throws Exception {
+    public static String decrypt(byte[] cipherTextWithNonce, SecretKey key) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        byte[] nonce = new byte[GCM_IV_LENGTH];
+        byte[] cipherText = new byte[cipherTextWithNonce.length - GCM_IV_LENGTH];
+        System.arraycopy(cipherTextWithNonce, 0, nonce, 0, nonce.length);
+        System.arraycopy(cipherTextWithNonce, nonce.length, cipherText, 0, cipherText.length);
         GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, nonce);
         cipher.init(Cipher.DECRYPT_MODE, key, spec);
-        byte[] plainText = cipher.doFinal(Base64.getDecoder().decode(cipherText));
+        byte[] plainText = cipher.doFinal(cipherText);
         return new String(plainText, StandardCharsets.UTF_8);
     }
 
@@ -34,10 +42,9 @@ public class Main {
         String keyString = "FkqObcL0tEeR2yH9TrI3w6==";
         SecretKey key = new SecretKeySpec(Base64.getDecoder().decode(keyString), "AES");
         String plaintext = "Hello, world!";
-        String cipherText = encrypt(plaintext, key);
-        String decryptedText = decrypt(cipherText, key);
-        System.out.println("Cipher Text: " + cipherText);
+        byte[] cipherTextWithNonce = encrypt(plaintext, key);
+        String decryptedText = decrypt(cipherTextWithNonce, key);
+        System.out.println("Cipher Text: " + Base64.getEncoder().encodeToString(cipherTextWithNonce));
         System.out.println("Decrypted Text: " + decryptedText);
     }
 }
-
