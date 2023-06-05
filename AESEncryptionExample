@@ -1,52 +1,43 @@
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-import java.security.spec.KeySpec;
-import java.security.SecureRandom;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.util.Base64;
 
 public class Main {
+    private static final int GCM_IV_LENGTH = 12;
+    private static final int GCM_TAG_LENGTH = 128;
 
-    private static final String ALGORITHM = "PBKDF2WithHmacSHA256";
-    private static final int ITERATION_COUNT = 65536;
-    private static final int KEY_LENGTH = 256;
-    private static final int SALT_LENGTH = 16;
-
-    public static String generateAESKey(String password, byte[] salt) throws Exception {
-        SecretKeyFactory factory = SecretKeyFactory.getInstance(ALGORITHM);
-        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, ITERATION_COUNT, KEY_LENGTH);
-        SecretKey tmp = factory.generateSecret(spec);
-        SecretKey secret = new SecretKeySpec(tmp.getEncoded(), "AES");
-        return Base64.getEncoder().encodeToString(secret.getEncoded());
-    }
-
-    public static String getPasswordFromAESKey(String aesKeyBase64, byte[] salt) throws Exception {
-        byte[] aesKeyBytes = Base64.getDecoder().decode(aesKeyBase64);
-        SecretKeyFactory factory = SecretKeyFactory.getInstance(ALGORITHM);
-        PBEKeySpec spec = (PBEKeySpec) factory.getKeySpec(new SecretKeySpec(aesKeyBytes, "AES"), PBEKeySpec.class);
-        return new String(spec.getPassword());
-    }
-
-    public static byte[] generateSalt() {
+    public static String encrypt(String plaintext, SecretKey key) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        final byte[] nonce = new byte[GCM_IV_LENGTH];
         SecureRandom random = new SecureRandom();
-        byte[] salt = new byte[SALT_LENGTH];
-        random.nextBytes(salt);
-        return salt;
+        random.nextBytes(nonce);
+        GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, nonce);
+        cipher.init(Cipher.ENCRYPT_MODE, key, spec);
+        byte[] cipherText = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
+        return Base64.getEncoder().encodeToString(cipherText);
     }
 
-    public static void main(String[] args) {
-        try {
-            String password = "myPassword";
-            byte[] salt = generateSalt();
-            String aesKey = generateAESKey(password, salt);
-            System.out.println("Generated AES Key: " + aesKey);
+    public static String decrypt(String cipherText, SecretKey key, byte[] nonce) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, nonce);
+        cipher.init(Cipher.DECRYPT_MODE, key, spec);
+        byte[] plainText = cipher.doFinal(Base64.getDecoder().decode(cipherText));
+        return new String(plainText, StandardCharsets.UTF_8);
+    }
 
-            String recoveredPassword = getPasswordFromAESKey(aesKey, salt);
-            System.out.println("Recovered Password: " + recoveredPassword);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    public static void main(String[] args) throws Exception {
+        // Example usage
+        String keyString = "FkqObcL0tEeR2yH9TrI3w6==";
+        SecretKey key = new SecretKeySpec(Base64.getDecoder().decode(keyString), "AES");
+        String plaintext = "Hello, world!";
+        String cipherText = encrypt(plaintext, key);
+        String decryptedText = decrypt(cipherText, key);
+        System.out.println("Cipher Text: " + cipherText);
+        System.out.println("Decrypted Text: " + decryptedText);
     }
 }
+
